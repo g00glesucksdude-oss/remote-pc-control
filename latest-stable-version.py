@@ -16,7 +16,7 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "night_shift_joystick_secure_v2")
 
 # --- CONFIGURATION ---
-PASSWORD_HASH = generate_password_hash(os.environ.get("REMOTE_PASS", "lmaoo"))
+PASSWORD_HASH = generate_password_hash(os.environ.get("REMOTE_PASS", "lol"))
 SCREEN_W, SCREEN_H = pyautogui.size()
 pyautogui.FAILSAFE = False
 zoom_factor = 1.0
@@ -331,6 +331,41 @@ INTERFACE = """
             border-radius: 10px;
             font-size: 10px;
         }
+
+        /* ---------- Virtual Keyboard Styles ---------- */
+        #virtual-keyboard {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: rgba(20,20,20,0.95);
+            padding: 6px 0;
+            z-index: 500;
+            display: none;
+            overflow-y: auto;
+        }
+        .vk-row {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 4px;
+        }
+        .vk-key {
+            background: #2a2a2a;
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 6px 8px;
+            margin: 2px;
+            font-size: 12px;
+            min-width: 30px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .vk-key.wide { min-width: 60px; }
+        .vk-key.extra-wide { min-width: 80px; }
+        .vk-key.active {
+            background: #4a9eff;
+        }
     </style>
 </head>
 <body>
@@ -351,6 +386,11 @@ INTERFACE = """
         <div class="setting-item">
             <span class="setting-label">Gyroscope Control</span>
             <div class="toggle-switch" id="gyro-toggle" onclick="toggleGyro()"></div>
+        </div>
+        
+        <div class="setting-item">
+            <span class="setting-label">Full Keyboard</span>
+            <div class="toggle-switch" id="keyboard-toggle" onclick="toggleFullKeyboard()"></div>
         </div>
         
         <div class="setting-item">
@@ -427,7 +467,147 @@ INTERFACE = """
         </div>
     </div>
 
+    <!-- -------------------------------------------------
+         Virtual Keyboard (hidden until “Full Keyboard” is enabled)
+         ------------------------------------------------- -->
+    <div id="virtual-keyboard">
+        <!-- Row 1: Function keys -->
+        <div class="vk-row">
+            <button class="vk-key" data-key="esc">Esc</button>
+            <button class="vk-key" data-key="f1">F1</button>
+            <button class="vk-key" data-key="f2">F2</button>
+            <button class="vk-key" data-key="f3">F3</button>
+            <button class="vk-key" data-key="f4">F4</button>
+            <button class="vk-key" data-key="f5">F5</button>
+            <button class="vk-key" data-key="f6">F6</button>
+            <button class="vk-key" data-key="f7">F7</button>
+            <button class="vk-key" data-key="f8">F8</button>
+            <button class="vk-key" data-key="f9">F9</button>
+            <button class="vk-key" data-key="f10">F10</button>
+            <button class="vk-key" data-key="f11">F11</button>
+            <button class="vk-key" data-key="f12">F12</button>
+        </div>
+
+        <!-- Row 2: Numbers & Backspace -->
+        <div class="vk-row">
+            <button class="vk-key" data-key="`">~</button>
+            <button class="vk-key" data-key="1">1</button>
+            <button class="vk-key" data-key="2">2</button>
+            <button class="vk-key" data-key="3">3</button>
+            <button class="vk-key" data-key="4">4</button>
+            <button class="vk-key" data-key="5">5</button>
+            <button class="vk-key" data-key="6">6</button>
+            <button class="vk-key" data-key="7">7</button>
+            <button class="vk-key" data-key="8">8</button>
+            <button class="vk-key" data-key="9">9</button>
+            <button class="vk-key" data-key="0">0</button>
+            <button class="vk-key" data-key="-">-</button>
+            <button class="vk-key" data-key="=">=</button>
+            <button class="vk-key wide" data-key="backspace">←Bksp</button>
+        </div>
+
+        <!-- Row 3: QWERTY top -->
+        <div class="vk-row">
+            <button class="vk-key wide" data-key="tab">Tab</button>
+            <button class="vk-key" data-key="q">Q</button>
+            <button class="vk-key" data-key="w">W</button>
+            <button class="vk-key" data-key="e">E</button>
+            <button class="vk-key" data-key="r">R</button>
+            <button class="vk-key" data-key="t">T</button>
+            <button class="vk-key" data-key="y">Y</button>
+            <button class="vk-key" data-key="u">U</button>
+            <button class="vk-key" data-key="i">I</button>
+            <button class="vk-key" data-key="o">O</button>
+            <button class="vk-key" data-key="p">P</button>
+            <button class="vk-key" data-key="[">[</button>
+            <button class="vk-key" data-key="]">]</button>
+            <button class="vk-key" data-key="\\">\\</button>
+        </div>
+
+        <!-- Row 4: Home row -->
+        <div class="vk-row">
+            <button class="vk-key wide" data-key="capslock">Caps</button>
+            <button class="vk-key" data-key="a">A</button>
+            <button class="vk-key" data-key="s">S</button>
+            <button class="vk-key" data-key="d">D</button>
+            <button class="vk-key" data-key="f">F</button>
+            <button class="vk-key" data-key="g">G</button>
+            <button class="vk-key" data-key="h">H</button>
+            <button class="vk-key" data-key="j">J</button>
+            <button class="vk-key" data-key="k">K</button>
+            <button class="vk-key" data-key="l">L</button>
+            <button class="vk-key" data-key=";">;</button>
+            <button class="vk-key" data-key="'">'</button>
+            <button class="vk-key wide" data-key="enter">Enter</button>
+        </div>
+
+        <!-- Row 5: Bottom row -->
+        <div class="vk-row">
+            <button class="vk-key wide" data-key="shift">Shift</button>
+            <button class="vk-key" data-key="z">Z</button>
+            <button class="vk-key" data-key="x">X</button>
+            <button class="vk-key" data-key="c">C</button>
+            <button class="vk-key" data-key="v">V</button>
+            <button class="vk-key" data-key="b">B</button>
+            <button class="vk-key" data-key="n">N</button>
+            <button class="vk-key" data-key="m">M</button>
+            <button class="vk-key" data-key=",">,</button>
+            <button class="vk-key" data-key=".">.</button>
+            <button class="vk-key" data-key="/">/</button>
+            <button class="vk-key wide" data-key="shift">Shift</button>
+        </div>
+
+        <!-- Row 6: Ctrl/Win/Alt/Space -->
+        <div class="vk-row">
+            <button class="vk-key wide" data-key="ctrl">Ctrl</button>
+            <button class="vk-key wide" data-key="win">Win</button>
+            <button class="vk-key wide" data-key="alt">Alt</button>
+            <button class="vk-key extra-wide" data-key="space">Space</button>
+            <button class="vk-key wide" data-key="alt">Alt</button>
+            <button class="vk-key wide" data-key="win">Win</button>
+            <button class="vk-key wide" data-key="menu">Menu</button>
+            <button class="vk-key wide" data-key="ctrl">Ctrl</button>
+        </div>
+
+        <!-- Row 7: Arrow keys -->
+        <div class="vk-row">
+            <button class="vk-key wide" data-key="left">←</button>
+            <button class="vk-key wide" data-key="up">↑</button>
+            <button class="vk-key wide" data-key="down">↓</button>
+            <button class="vk-key wide" data-key="right">→</button>
+        </div>
+
+        <!-- Row 8: Numeric keypad -->
+        <div class="vk-row">
+            <button class="vk-key wide" data-key="numlock">NumLk</button>
+            <button class="vk-key" data-key="divide">/</button>
+            <button class="vk-key" data-key="multiply">*</button>
+            <button class="vk-key" data-key="subtract">-</button>
+        </div>
+        <div class="vk-row">
+            <button class="vk-key" data-key="num7">7</button>
+            <button class="vk-key" data-key="num8">8</button>
+            <button class="vk-key" data-key="num9">9</button>
+            <button class="vk-key wide" data-key="add">+</button>
+        </div>
+        <div class="vk-row">
+            <button class="vk-key" data-key="num4">4</button>
+            <button class="vk-key" data-key="num5">5</button>
+            <button class="vk-key" data-key="num6">6</button>
+        </div>
+        <div class="vk-row">
+            <button class="vk-key" data-key="num1">1</button>
+            <button class="vk-key" data-key="num2">2</button>
+            <button class="vk-key" data-key="num3">3</button>
+        </div>
+        <div class="vk-row">
+            <button class="vk-key wide" data-key="num0">0</button>
+            <button class="vk-key" data-key="decimal">.</button>
+        </div>
+    </div>
+
     <script>
+        // ------- Global variables ----------
         let isDragging = false;
         let isFullscreen = false;
         let gyroEnabled = false;
@@ -436,12 +616,13 @@ INTERFACE = """
         let orientationInitialized = false;
         let currentZoom = 1.0;
         let isEditMode = false;
+        let fullKeyboardEnabled = false;   // NEW
         
         // Managers for both joysticks
         let normalManager = null;
         let fullscreenManager = null;
         
-        // Initialize normal mode joystick
+        // ---------- JOYSTICK ----------
         function initNormalJoystick() {
             if (normalManager) normalManager.destroy();
             normalManager = nipplejs.create({
@@ -451,11 +632,9 @@ INTERFACE = """
                 color: '#4a9eff',
                 size: 120
             });
-
             let lastMove = 0;
             normalManager.on('move', function (evt, data) {
                 if (gyroEnabled) return;
-                
                 let now = Date.now();
                 if (data.direction && now - lastMove > 40) {
                     lastMove = now;
@@ -467,8 +646,6 @@ INTERFACE = """
                 }
             });
         }
-        
-        // Initialize fullscreen joystick
         function initFullscreenJoystick() {
             if (fullscreenManager) fullscreenManager.destroy();
             fullscreenManager = nipplejs.create({
@@ -478,11 +655,9 @@ INTERFACE = """
                 color: '#4a9eff',
                 size: 140
             });
-
             let lastMove = 0;
             fullscreenManager.on('move', function (evt, data) {
                 if (gyroEnabled) return;
-                
                 let now = Date.now();
                 if (data.direction && now - lastMove > 40) {
                     lastMove = now;
@@ -494,17 +669,14 @@ INTERFACE = """
                 }
             });
         }
-        
-        // Initialize on load
         initNormalJoystick();
         initFullscreenJoystick();
 
-        // Gyroscope control
+        // ---------- GYROSCOPE ----------
         function toggleGyro() {
             gyroEnabled = !gyroEnabled;
             const toggle = document.getElementById('gyro-toggle');
             toggle.classList.toggle('active');
-            
             if (gyroEnabled && typeof DeviceOrientationEvent !== 'undefined') {
                 if (typeof DeviceOrientationEvent.requestPermission === 'function') {
                     DeviceOrientationEvent.requestPermission()
@@ -526,48 +698,39 @@ INTERFACE = """
                 orientationInitialized = false;
             }
         }
-
         function handleOrientation(event) {
             if (!gyroEnabled) return;
-            
             const beta = event.beta;
             const gamma = event.gamma;
-            
             if (!orientationInitialized) {
                 lastOrientation = { beta, gamma };
                 orientationInitialized = true;
                 return;
             }
-            
             const deltaX = (gamma - lastOrientation.gamma) * sensitivity * 2;
             const deltaY = (beta - lastOrientation.beta) * sensitivity * 2;
-            
             if (Math.abs(deltaX) > 0.5 || Math.abs(deltaY) > 0.5) {
                 fetch(`/action?type=move_joy&x=${deltaX}&y=${deltaY}`);
             }
-            
             lastOrientation = { beta, gamma };
         }
 
-        // Sensitivity control
+        // ---------- SENSITIVITY ----------
         document.getElementById('sensitivity-slider').addEventListener('input', function(e) {
             sensitivity = parseInt(e.target.value);
             document.getElementById('sensitivity-value').textContent = sensitivity;
         });
 
-        // Volume control
+        // ---------- VOLUME ----------
         function toggleVolume() {
             const vol = document.getElementById('volume-control');
             vol.classList.toggle('show');
         }
-
         document.getElementById('volume-slider').addEventListener('input', function(e) {
             const val = e.target.value;
             document.getElementById('volume-value').textContent = val + '%';
             fetch(`/action?type=volume&val=${val}`);
         });
-
-        // Get current volume on load
         fetch('/get_volume').then(r => r.json()).then(data => {
             if (data.volume !== null) {
                 const vol = Math.round(data.volume * 100);
@@ -576,6 +739,7 @@ INTERFACE = """
             }
         });
 
+        // ---------- DRAG ----------
         function toggleDrag() {
             isDragging = !isDragging;
             const btns = document.querySelectorAll('#dragBtn, #fs-drag');
@@ -586,28 +750,22 @@ INTERFACE = """
             fetch(`/action?type=${isDragging ? 'drag_start' : 'drag_end'}`);
         }
 
+        // ---------- FULLSCREEN ----------
         function toggleFullscreen() {
             isFullscreen = !isFullscreen;
             document.body.classList.toggle('fullscreen');
-            
-            // Load saved button positions if entering fullscreen
             if (isFullscreen) {
                 loadButtonPositions();
-            }
-            
-            // Request fullscreen API
-            if (isFullscreen && document.documentElement.requestFullscreen) {
-                document.documentElement.requestFullscreen();
-            } else if (document.exitFullscreen) {
-                document.exitFullscreen();
+                if (document.documentElement.requestFullscreen) {
+                    document.documentElement.requestFullscreen();
+                }
+            } else {
+                exitFullscreen();
             }
         }
-
         function exitFullscreen() {
             isFullscreen = false;
             document.body.classList.remove('fullscreen');
-            
-            // Exit fullscreen API
             if (document.exitFullscreen) {
                 document.exitFullscreen();
             } else if (document.webkitExitFullscreen) {
@@ -618,30 +776,64 @@ INTERFACE = """
                 document.msExitFullscreen();
             }
         }
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+        document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+        function handleFullscreenChange() {
+            const isInFullscreen = !!(document.fullscreenElement || 
+                                     document.webkitFullscreenElement || 
+                                     document.mozFullScreenElement || 
+                                     document.msFullscreenElement);
+            if (!isInFullscreen && isFullscreen) {
+                exitFullscreen();
+            }
+        }
 
+        // ---------- SETTINGS ----------
         function toggleSettings() {
             document.getElementById('settings-panel').classList.toggle('open');
         }
 
+        // ---------- FULL KEYBOARD ----------
+        function toggleFullKeyboard() {
+            fullKeyboardEnabled = !fullKeyboardEnabled;
+            const vk = document.getElementById('virtual-keyboard');
+            vk.style.display = fullKeyboardEnabled ? 'block' : 'none';
+            const toggle = document.getElementById('keyboard-toggle');
+            toggle.classList.toggle('active');
+        }
+
+        // Click a virtual key
+        document.getElementById('virtual-keyboard').addEventListener('click', function(e) {
+            if (e.target.classList.contains('vk-key')) {
+                const key = e.target.dataset.key;
+                if (!key) return;
+                // visual feedback
+                e.target.classList.add('active');
+                setTimeout(() => e.target.classList.remove('active'), 150);
+                fetch(`/action?type=key&key=${encodeURIComponent(key)}`);
+            }
+        });
+
+        // ---------- SEND TEXT ----------
         function sendText() {
             const input = document.getElementById('kb');
             const text = input.value.trim();
-            
             if (text === "") {
-                // If empty, send Enter key
                 fetch(`/action?type=enter`);
             } else {
-                // If has text, send the text
                 fetch(`/action?type=type&val=${encodeURIComponent(text)}`);
             }
             input.value = '';
         }
 
+        // ---------- GENERAL ACTION ----------
         function doAction(type) {
             fetch(`/action?type=${type}`);
         }
 
-        // Click/tap on screen to move mouse (NORMAL MODE)
+        // ---------- SCREEN CLICK (NORMAL MODE) ----------
         document.getElementById('viewer').addEventListener('click', function(e) {
             if (e.target.tagName === 'IMG') {
                 const rect = e.target.getBoundingClientRect();
@@ -651,15 +843,11 @@ INTERFACE = """
             }
         });
         
-        // Click/tap on screen to move mouse (FULLSCREEN MODE)
+        // ---------- SCREEN CLICK (FULLSCREEN MODE) ----------
         document.addEventListener('click', function(e) {
             if (!isFullscreen) return;
-            
             const streamFs = document.getElementById('stream-fs');
-            const viewer = streamFs.closest('.fs-viewer');
-            
-            // Check if click is on the video stream (not on buttons)
-            if (e.target === streamFs || e.target === viewer) {
+            if (e.target === streamFs) {
                 const rect = streamFs.getBoundingClientRect();
                 const x = (e.clientX - rect.left) / rect.width * {{ screen_w }};
                 const y = (e.clientY - rect.top) / rect.height * {{ screen_h }};
@@ -667,7 +855,7 @@ INTERFACE = """
             }
         });
 
-        // Wheel scroll on desktop
+        // ---------- MOUSE WHEEL ----------
         document.getElementById('viewer').addEventListener('wheel', function(e) {
             e.preventDefault();
             const direction = e.deltaY > 0 ? 'scroll_down' : 'scroll_up';
@@ -678,25 +866,21 @@ INTERFACE = """
             setTimeout(() => indicator.style.display = 'none', 500);
         }, { passive: false });
 
-        // Touch scroll on mobile (two-finger swipe)
+        // ---------- TWO‑FINGER TOUCH SCROLL ----------
         let touchStartY = 0;
         const viewers = [document.getElementById('viewer'), document.querySelector('.fs-viewer')];
-        
         viewers.forEach(viewer => {
             if (!viewer) return;
-            
             viewer.addEventListener('touchstart', function(e) {
                 if (e.touches.length === 2) {
                     touchStartY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
                 }
             });
-
             viewer.addEventListener('touchmove', function(e) {
                 if (e.touches.length === 2) {
                     e.preventDefault();
                     const currentY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
                     const delta = touchStartY - currentY;
-                    
                     if (Math.abs(delta) > 30) {
                         const direction = delta > 0 ? 'scroll_up' : 'scroll_down';
                         const indicator = document.getElementById('scroll-indicator');
@@ -710,12 +894,11 @@ INTERFACE = """
             }, { passive: false });
         });
 
-        // Edit mode for draggable buttons
+        // ---------- EDIT MODE FOR FS BUTTONS ----------
         function toggleEditMode() {
             isEditMode = !isEditMode;
             const editBtn = document.getElementById('fs-edit');
             const buttons = document.querySelectorAll('.fs-btn:not(#fs-edit):not(#fs-exit)');
-            
             if (isEditMode) {
                 editBtn.textContent = '🔒 LOCK';
                 editBtn.classList.add('active');
@@ -734,107 +917,76 @@ INTERFACE = """
             }
         }
 
-        // Draggable functionality
         function makeDraggable(element) {
             let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
             let isDraggingElement = false;
-            
             element.onmousedown = dragMouseDown;
             element.ontouchstart = dragTouchStart;
-
             function dragMouseDown(e) {
-                e.preventDefault();
-                e.stopPropagation();
+                e.preventDefault(); e.stopPropagation();
                 isDraggingElement = true;
-                pos3 = e.clientX;
-                pos4 = e.clientY;
+                pos3 = e.clientX; pos4 = e.clientY;
                 document.onmouseup = closeDragElement;
                 document.onmousemove = elementDrag;
                 element.classList.add('dragging');
                 element.style.cursor = 'grabbing';
             }
-            
             function dragTouchStart(e) {
-                e.preventDefault();
-                e.stopPropagation();
+                e.preventDefault(); e.stopPropagation();
                 isDraggingElement = true;
                 const touch = e.touches[0];
-                pos3 = touch.clientX;
-                pos4 = touch.clientY;
+                pos3 = touch.clientX; pos4 = touch.clientY;
                 document.ontouchend = closeDragElement;
                 document.ontouchmove = elementDragTouch;
                 element.classList.add('dragging');
             }
-
             function elementDrag(e) {
                 if (!isDraggingElement) return;
                 e.preventDefault();
-                
-                // Calculate movement
                 pos1 = pos3 - e.clientX;
                 pos2 = pos4 - e.clientY;
-                pos3 = e.clientX;
-                pos4 = e.clientY;
-                
-                // Apply movement immediately
+                pos3 = e.clientX; pos4 = e.clientY;
                 const newTop = element.offsetTop - pos2;
                 const newLeft = element.offsetLeft - pos1;
-                
-                // Keep within bounds with padding
-                const padding = 10;
-                const maxTop = window.innerHeight - element.offsetHeight - padding;
-                const maxLeft = window.innerWidth - element.offsetWidth - padding;
-                
-                element.style.top = Math.max(padding, Math.min(newTop, maxTop)) + "px";
-                element.style.left = Math.max(padding, Math.min(newLeft, maxLeft)) + "px";
+                const pad = 10;
+                const maxTop = window.innerHeight - element.offsetHeight - pad;
+                const maxLeft = window.innerWidth - element.offsetWidth - pad;
+                element.style.top = Math.max(pad, Math.min(newTop, maxTop)) + "px";
+                element.style.left = Math.max(pad, Math.min(newLeft, maxLeft)) + "px";
                 element.style.bottom = 'auto';
                 element.style.right = 'auto';
             }
-            
             function elementDragTouch(e) {
                 if (!isDraggingElement) return;
                 e.preventDefault();
-                
                 const touch = e.touches[0];
-                
-                // Calculate movement
                 pos1 = pos3 - touch.clientX;
                 pos2 = pos4 - touch.clientY;
-                pos3 = touch.clientX;
-                pos4 = touch.clientY;
-                
-                // Apply movement immediately
+                pos3 = touch.clientX; pos4 = touch.clientY;
                 const newTop = element.offsetTop - pos2;
                 const newLeft = element.offsetLeft - pos1;
-                
-                // Keep within bounds with padding
-                const padding = 10;
-                const maxTop = window.innerHeight - element.offsetHeight - padding;
-                const maxLeft = window.innerWidth - element.offsetWidth - padding;
-                
-                element.style.top = Math.max(padding, Math.min(newTop, maxTop)) + "px";
-                element.style.left = Math.max(padding, Math.min(newLeft, maxLeft)) + "px";
+                const pad = 10;
+                const maxTop = window.innerHeight - element.offsetHeight - pad;
+                const maxLeft = window.innerWidth - element.offsetWidth - pad;
+                element.style.top = Math.max(pad, Math.min(newTop, maxTop)) + "px";
+                element.style.left = Math.max(pad, Math.min(newLeft, maxLeft)) + "px";
                 element.style.bottom = 'auto';
                 element.style.right = 'auto';
             }
-
             function closeDragElement() {
                 isDraggingElement = false;
-                document.onmouseup = null;
-                document.onmousemove = null;
-                document.ontouchend = null;
-                document.ontouchmove = null;
+                document.onmouseup = null; document.onmousemove = null;
+                document.ontouchend = null; document.ontouchmove = null;
                 element.classList.remove('dragging');
                 element.style.cursor = 'move';
             }
         }
-
         function removeDraggable(element) {
             element.onmousedown = null;
             element.ontouchstart = null;
         }
 
-        // Save and load button positions
+        // ---------- BUTTON POSITION SAVE ----------
         function saveButtonPositions() {
             const positions = {};
             document.querySelectorAll('.fs-btn').forEach(btn => {
@@ -849,45 +1001,21 @@ INTERFACE = """
             });
             localStorage.setItem('buttonPositions', JSON.stringify(positions));
         }
-
         function loadButtonPositions() {
             const saved = localStorage.getItem('buttonPositions');
             if (saved) {
                 const positions = JSON.parse(saved);
                 Object.keys(positions).forEach(id => {
                     const btn = document.getElementById(id);
-                    if (btn) {
-                        Object.assign(btn.style, positions[id]);
-                    }
+                    if (btn) Object.assign(btn.style, positions[id]);
                 });
             }
         }
-
         function resetButtonPositions() {
             localStorage.removeItem('buttonPositions');
             location.reload();
         }
-
-        // Load button positions on startup
         setTimeout(loadButtonPositions, 500);
-        
-        // Handle fullscreen change events
-        document.addEventListener('fullscreenchange', handleFullscreenChange);
-        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
-        document.addEventListener('MSFullscreenChange', handleFullscreenChange);
-        
-        function handleFullscreenChange() {
-            const isInFullscreen = !!(document.fullscreenElement || 
-                                     document.webkitFullscreenElement || 
-                                     document.mozFullScreenElement || 
-                                     document.msFullscreenElement);
-            
-            if (!isInFullscreen && isFullscreen) {
-                // User exited fullscreen via ESC or browser controls
-                exitFullscreen();
-            }
-        }
     </script>
 </body>
 </html>
@@ -972,63 +1100,71 @@ def video_feed():
         return "Unauthorized", 401
         
     def gen():
-        global zoom_factor, zoom_center_x, zoom_center_y, last_click_time
+        global zoom_factor, last_click_time
         with mss.mss() as sct:
             monitor = sct.monitors[1]
             while True:
                 img = np.array(sct.grab(monitor))
-                frame = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+                raw_frame = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
 
-                # Get current mouse position for zoom center
+                # Original capture size (might differ from SCREEN_W/SCREEN_H on high‑DPI displays)
+                full_h, full_w = raw_frame.shape[:2]
+
+                # Current mouse position (screen coordinates)
                 pos_x, pos_y = pyautogui.position()
 
-                # Zoom logic - zoom at mouse cursor position
                 if zoom_factor > 1.0:
-                    h, w = frame.shape[:2]
-                    
-                    # Calculate the size of the zoomed region
-                    new_h = int(h / zoom_factor)
-                    new_w = int(w / zoom_factor)
-                    
-                    # Center the zoom on the mouse cursor
-                    center_x = int(pos_x * w / SCREEN_W)
-                    center_y = int(pos_y * h / SCREEN_H)
-                    
-                    # Calculate crop boundaries
+                    # ---- ZOOM REGION ----
+                    new_h = int(full_h / zoom_factor)
+                    new_w = int(full_w / zoom_factor)
+
+                    # Centered on the *screen* mouse position
+                    center_x = int(pos_x * full_w / SCREEN_W)
+                    center_y = int(pos_y * full_h / SCREEN_H)
+
                     x1 = max(0, center_x - new_w // 2)
                     y1 = max(0, center_y - new_h // 2)
-                    x2 = min(w, x1 + new_w)
-                    y2 = min(h, y1 + new_h)
-                    
-                    # Adjust if at edges
+                    x2 = min(full_w, x1 + new_w)
+                    y2 = min(full_h, y1 + new_h)
+
+                    # Edge correction
                     if x2 - x1 < new_w:
                         x1 = max(0, x2 - new_w)
                     if y2 - y1 < new_h:
                         y1 = max(0, y2 - new_h)
-                    
-                    frame = frame[y1:y2, x1:x2]
-                    frame = cv2.resize(frame, (960, 540))
-                else:
-                    frame = cv2.resize(frame, (960, 540))
 
-                # Cursor overlay
-                scale_x = 960 / SCREEN_W
-                scale_y = 540 / SCREEN_H
-                
-                if zoom_factor > 1.0:
-                    # Adjust cursor position for zoomed view
-                    cx = int((pos_x - x1 * SCREEN_W / w) * 960 / (new_w * SCREEN_W / w))
-                    cy = int((pos_y - y1 * SCREEN_H / h) * 540 / (new_h * SCREEN_H / h))
+                    frame_crop = raw_frame[y1:y2, x1:x2]
+
+                    # ------- CURSOR OVERLAY CALCULATION -------
+                    region_x_screen = x1 * SCREEN_W / full_w
+                    region_y_screen = y1 * SCREEN_H / full_h
+                    region_w_screen = (x2 - x1) * SCREEN_W / full_w
+                    region_h_screen = (y2 - y1) * SCREEN_H / full_h
+
+                    rel_x = (pos_x - region_x_screen) / region_w_screen
+                    rel_y = (pos_y - region_y_screen) / region_h_screen
+
+                    # Clamp just in case
+                    rel_x = max(0, min(rel_x, 1))
+                    rel_y = max(0, min(rel_y, 1))
+
+                    cx = int(rel_x * 960)
+                    cy = int(rel_y * 540)
+
+                    # Resize for streaming
+                    frame = cv2.resize(frame_crop, (960, 540))
                 else:
-                    cx = int(pos_x * scale_x)
-                    cy = int(pos_y * scale_y)
-                
-                # Only draw cursor if it's within bounds
+                    # No zoom – direct scaling
+                    cx = int(pos_x * 960 / SCREEN_W)
+                    cy = int(pos_y * 540 / SCREEN_H)
+                    frame = cv2.resize(raw_frame, (960, 540))
+
+                # ----- DRAW CURSOR -----
                 if 0 <= cx < 960 and 0 <= cy < 540:
                     cv2.circle(frame, (cx, cy), 12, (74, 158, 255), 2)
                     cv2.circle(frame, (cx, cy), 2, (74, 158, 255), -1)
 
-                    # Click highlight
+                    # Click visual feedback
                     if time.time() - last_click_time < 0.3:
                         cv2.circle(frame, (cx, cy), 30, (0, 255, 0), 3)
 
@@ -1043,8 +1179,7 @@ def mark_click():
     last_click_time = time.time()
 
 def zoom_in():
-    global zoom_factor, zoom_center_x, zoom_center_y
-    zoom_center_x, zoom_center_y = pyautogui.position()
+    global zoom_factor
     zoom_factor = min(zoom_factor + 0.25, 4.0)
 
 def zoom_out():
@@ -1075,6 +1210,11 @@ def middle_click():
     pyautogui.middleClick()
     mark_click()
 
+def press_key(key):
+    if key:
+        pyautogui.press(key)
+
+# Mapping from action name → callable
 ACTIONS = {
     "click": lambda: (pyautogui.click(), mark_click()),
     "middle_click": middle_click,
@@ -1084,15 +1224,18 @@ ACTIONS = {
     "type": lambda val: pyautogui.write(val, interval=0.01),
     "enter": press_enter,
     "move_joy": lambda x, y: pyautogui.moveRel(float(x)*2, float(y)*2, _pause=False),
-    "move_abs": lambda x, y: (setattr(__import__('__main__'), 'zoom_center_x', float(x)), 
-                               setattr(__import__('__main__'), 'zoom_center_y', float(y)),
-                               pyautogui.moveTo(float(x), float(y), _pause=False)),
+    "move_abs": lambda x, y: (
+        setattr(__import__('__main__'), 'zoom_center_x', float(x)),
+        setattr(__import__('__main__'), 'zoom_center_y', float(y)),
+        pyautogui.moveTo(float(x), float(y), _pause=False)
+    ),
     "zoom_in": zoom_in,
     "zoom_out": zoom_out,
     "zoom_reset": zoom_reset,
     "volume": set_volume,
     "scroll_up": scroll_up,
     "scroll_down": scroll_down,
+    "key": press_key,                 # NEW – generic key press
 }
 
 @app.route('/action')
@@ -1107,6 +1250,8 @@ def action():
             ACTIONS[t](request.args.get('x', 0), request.args.get('y', 0))
         elif t == "volume":
             ACTIONS[t](request.args.get('val', 50))
+        elif t == "key":                         # NEW – send key name
+            ACTIONS[t](request.args.get('key', ''))
         else:
             ACTIONS[t]()
     return "OK"
@@ -1122,10 +1267,8 @@ if __name__ == '__main__':
     print(f"🔊 Audio control: {'Enabled' if audio_available else 'Disabled (install pycaw)'}")
     print("=" * 50)
     print("\n✨ NEW FEATURES:")
-    print("   • Empty text field + Send = Enter key")
-    print("   • Middle click button added")
-    print("   • Dedicated Exit Fullscreen button")
-    print("   • Customizable fullscreen button positions")
-    print("   • Drag toggle in fullscreen mode")
+    print("   • Fixed cursor offset when zoomed")
+    print("   • Full‑keyboard overlay (all keys + numpad) via Settings → Full Keyboard")
+    print("   • Virtual‑key press goes through `/action?type=key`")
     print("=" * 50)
     app.run(host='0.0.0.0', port=5000, threaded=True, debug=False)
