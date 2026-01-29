@@ -16,7 +16,7 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "night_shift_joystick_secure_v2")
 
 # --- CONFIGURATION ---
-PASSWORD_HASH = generate_password_hash(os.environ.get("REMOTE_PASS", "1234"))
+PASSWORD_HASH = generate_password_hash(os.environ.get("REMOTE_PASS", "lmaoo"))
 SCREEN_W, SCREEN_H = pyautogui.size()
 pyautogui.FAILSAFE = False
 zoom_factor = 1.0
@@ -241,7 +241,13 @@ INTERFACE = """
         /* Fullscreen UI */
         .fullscreen-controls {
             position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             display: none;
+            pointer-events: none;
+            z-index: 100;
         }
         
         .fullscreen .fullscreen-controls {
@@ -260,17 +266,21 @@ INTERFACE = """
             cursor: pointer;
             transition: all 0.2s;
             z-index: 200;
+            pointer-events: auto;
         }
         
         .fs-btn.draggable {
             border-color: #4a9eff;
             box-shadow: 0 0 15px rgba(74, 158, 255, 0.5);
             cursor: move;
+            cursor: grab;
         }
         
         .fs-btn.dragging {
-            opacity: 0.7;
-            transform: scale(1.1);
+            opacity: 0.8;
+            transform: scale(1.05);
+            cursor: grabbing !important;
+            box-shadow: 0 0 25px rgba(74, 158, 255, 0.8);
         }
         
         /* Volume Control */
@@ -309,25 +319,9 @@ INTERFACE = """
             z-index: 2000;
         }
         
-        /* Status Bar */
+        /* Status Bar - Hidden */
         #status-bar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            background: rgba(26, 26, 26, 0.95);
-            padding: 8px 15px;
-            font-size: 11px;
-            color: #888;
-            display: flex;
-            justify-content: space-between;
-            z-index: 999;
-            border-bottom: 1px solid #333;
-        }
-        
-        .fullscreen #status-bar {
-            background: rgba(26, 26, 26, 0.7);
-            backdrop-filter: blur(10px);
+            display: none;
         }
         
         .zoom-badge {
@@ -340,13 +334,6 @@ INTERFACE = """
     </style>
 </head>
 <body>
-    <!-- Status Bar -->
-    <div id="status-bar">
-        <span>🖥️ Remote Desktop</span>
-        <span id="zoom-display">Zoom: <span class="zoom-badge">100%</span></span>
-        <span id="connection-status">●</span>
-    </div>
-
     <!-- Scroll Indicator -->
     <div id="scroll-indicator"></div>
     
@@ -392,25 +379,28 @@ INTERFACE = """
         </div>
         <div id="joystick-zone"></div>
         <div class="typing">
-            <input type="text" id="kb" placeholder="Type here..." onkeypress="if(event.key==='Enter')sendText()">
+            <input type="text" id="kb" placeholder="Type here... (empty = Enter)" onkeypress="if(event.key==='Enter')sendText()">
             <button onclick="sendText()">SEND</button>
         </div>
         <div class="controls">
             <button onclick="doAction('click')">🖱️ LEFT</button>
+            <button onclick="doAction('middle_click')">🖱️ MIDDLE</button>
             <button onclick="doAction('right_click')">🖱️ RIGHT</button>
-            <button id="dragBtn" onclick="toggleDrag()">✋ DRAG OFF</button>
             
+            <button id="dragBtn" onclick="toggleDrag()">✋ DRAG OFF</button>
             <button onclick="doAction('scroll_up')">⬆️ SCROLL</button>
             <button onclick="doAction('scroll_down')">⬇️ SCROLL</button>
-            <button onclick="toggleVolume()">🔊 VOLUME</button>
             
+            <button onclick="toggleVolume()">🔊 VOLUME</button>
             <button onclick="doAction('zoom_in')">🔍 ZOOM+</button>
             <button onclick="doAction('zoom_out')">🔍 ZOOM-</button>
-            <button onclick="doAction('zoom_reset')">↺ RESET</button>
             
+            <button onclick="doAction('zoom_reset')">↺ RESET</button>
             <button onclick="toggleFullscreen()">⛶ FULL</button>
             <button onclick="toggleSettings()">⚙️ SETTINGS</button>
-            <button onclick="location.href='/logout'">🔒 LOCK</button>
+        </div>
+        <div class="controls" style="grid-template-columns: 1fr;">
+            <button onclick="location.href='/logout'" style="background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%);">🔒 LOCK</button>
         </div>
     </div>
 
@@ -423,16 +413,17 @@ INTERFACE = """
         
         <!-- Fullscreen Controls -->
         <div class="fullscreen-controls">
-            <button class="fs-btn" id="fs-edit" style="top: 60px; right: 20px;" onclick="toggleEditMode()">🔓 EDIT</button>
-            <button class="fs-btn" id="fs-click" style="bottom: 280px; left: 20px;" onclick="doAction('click')">LEFT</button>
-            <button class="fs-btn" id="fs-right" style="bottom: 280px; left: 110px;" onclick="doAction('right_click')">RIGHT</button>
-            <button class="fs-btn" id="fs-drag" style="bottom: 210px; left: 20px;" onclick="toggleDrag()">DRAG</button>
-            <button class="fs-btn" id="fs-scroll-up" style="bottom: 210px; left: 110px;" onclick="doAction('scroll_up')">↑</button>
-            <button class="fs-btn" id="fs-scroll-down" style="bottom: 140px; left: 110px;" onclick="doAction('scroll_down')">↓</button>
+            <button class="fs-btn" id="fs-edit" style="top: 20px; right: 20px;" onclick="toggleEditMode()">🔓 EDIT</button>
+            <button class="fs-btn" id="fs-click" style="bottom: 330px; left: 20px;" onclick="doAction('click')">LEFT</button>
+            <button class="fs-btn" id="fs-middle" style="bottom: 330px; left: 110px;" onclick="doAction('middle_click')">MIDDLE</button>
+            <button class="fs-btn" id="fs-right" style="bottom: 330px; left: 200px;" onclick="doAction('right_click')">RIGHT</button>
+            <button class="fs-btn" id="fs-drag" style="bottom: 260px; left: 20px;" onclick="toggleDrag()">DRAG</button>
+            <button class="fs-btn" id="fs-scroll-up" style="bottom: 260px; left: 110px;" onclick="doAction('scroll_up')">↑</button>
+            <button class="fs-btn" id="fs-scroll-down" style="bottom: 190px; left: 110px;" onclick="doAction('scroll_down')">↓</button>
             
-            <button class="fs-btn" id="fs-zoom-in" style="top: 130px; right: 20px;" onclick="doAction('zoom_in')">🔍+</button>
-            <button class="fs-btn" id="fs-zoom-out" style="top: 200px; right: 20px;" onclick="doAction('zoom_out')">🔍-</button>
-            <button class="fs-btn" id="fs-exit" style="top: 60px; left: 20px;" onclick="toggleFullscreen()">EXIT</button>
+            <button class="fs-btn" id="fs-zoom-in" style="top: 90px; right: 20px;" onclick="doAction('zoom_in')">🔍+</button>
+            <button class="fs-btn" id="fs-zoom-out" style="top: 160px; right: 20px;" onclick="doAction('zoom_out')">🔍-</button>
+            <button class="fs-btn" id="fs-exit" style="top: 20px; left: 20px;" onclick="exitFullscreen()">EXIT</button>
         </div>
     </div>
 
@@ -599,7 +590,7 @@ INTERFACE = """
             isFullscreen = !isFullscreen;
             document.body.classList.toggle('fullscreen');
             
-            // Load saved button positions if exiting edit mode
+            // Load saved button positions if entering fullscreen
             if (isFullscreen) {
                 loadButtonPositions();
             }
@@ -612,16 +603,38 @@ INTERFACE = """
             }
         }
 
+        function exitFullscreen() {
+            isFullscreen = false;
+            document.body.classList.remove('fullscreen');
+            
+            // Exit fullscreen API
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.mozCancelFullScreen) {
+                document.mozCancelFullScreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
+            }
+        }
+
         function toggleSettings() {
             document.getElementById('settings-panel').classList.toggle('open');
         }
 
         function sendText() {
             const input = document.getElementById('kb');
-            if (input.value.trim() !== "") {
-                fetch(`/action?type=type&val=${encodeURIComponent(input.value)}`);
-                input.value = '';
+            const text = input.value.trim();
+            
+            if (text === "") {
+                // If empty, send Enter key
+                fetch(`/action?type=enter`);
+            } else {
+                // If has text, send the text
+                fetch(`/action?type=type&val=${encodeURIComponent(text)}`);
             }
+            input.value = '';
         }
 
         function doAction(type) {
@@ -697,15 +710,6 @@ INTERFACE = """
             }, { passive: false });
         });
 
-        // Update zoom display
-        setInterval(() => {
-            fetch('/get_zoom').then(r => r.json()).then(data => {
-                const zoomPercent = Math.round(data.zoom * 100);
-                document.querySelector('.zoom-badge').textContent = zoomPercent + '%';
-                currentZoom = data.zoom;
-            });
-        }, 1000);
-
         // Edit mode for draggable buttons
         function toggleEditMode() {
             isEditMode = !isEditMode;
@@ -733,21 +737,27 @@ INTERFACE = """
         // Draggable functionality
         function makeDraggable(element) {
             let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+            let isDraggingElement = false;
             
             element.onmousedown = dragMouseDown;
             element.ontouchstart = dragTouchStart;
 
             function dragMouseDown(e) {
                 e.preventDefault();
+                e.stopPropagation();
+                isDraggingElement = true;
                 pos3 = e.clientX;
                 pos4 = e.clientY;
                 document.onmouseup = closeDragElement;
                 document.onmousemove = elementDrag;
                 element.classList.add('dragging');
+                element.style.cursor = 'grabbing';
             }
             
             function dragTouchStart(e) {
                 e.preventDefault();
+                e.stopPropagation();
+                isDraggingElement = true;
                 const touch = e.touches[0];
                 pos3 = touch.clientX;
                 pos4 = touch.clientY;
@@ -757,51 +767,65 @@ INTERFACE = """
             }
 
             function elementDrag(e) {
+                if (!isDraggingElement) return;
                 e.preventDefault();
+                
+                // Calculate movement
                 pos1 = pos3 - e.clientX;
                 pos2 = pos4 - e.clientY;
                 pos3 = e.clientX;
                 pos4 = e.clientY;
                 
+                // Apply movement immediately
                 const newTop = element.offsetTop - pos2;
                 const newLeft = element.offsetLeft - pos1;
                 
-                // Keep within bounds
-                const maxTop = window.innerHeight - element.offsetHeight;
-                const maxLeft = window.innerWidth - element.offsetWidth;
+                // Keep within bounds with padding
+                const padding = 10;
+                const maxTop = window.innerHeight - element.offsetHeight - padding;
+                const maxLeft = window.innerWidth - element.offsetWidth - padding;
                 
-                element.style.top = Math.max(0, Math.min(newTop, maxTop)) + "px";
-                element.style.left = Math.max(0, Math.min(newLeft, maxLeft)) + "px";
+                element.style.top = Math.max(padding, Math.min(newTop, maxTop)) + "px";
+                element.style.left = Math.max(padding, Math.min(newLeft, maxLeft)) + "px";
                 element.style.bottom = 'auto';
                 element.style.right = 'auto';
             }
             
             function elementDragTouch(e) {
+                if (!isDraggingElement) return;
                 e.preventDefault();
+                
                 const touch = e.touches[0];
+                
+                // Calculate movement
                 pos1 = pos3 - touch.clientX;
                 pos2 = pos4 - touch.clientY;
                 pos3 = touch.clientX;
                 pos4 = touch.clientY;
                 
+                // Apply movement immediately
                 const newTop = element.offsetTop - pos2;
                 const newLeft = element.offsetLeft - pos1;
                 
-                const maxTop = window.innerHeight - element.offsetHeight;
-                const maxLeft = window.innerWidth - element.offsetWidth;
+                // Keep within bounds with padding
+                const padding = 10;
+                const maxTop = window.innerHeight - element.offsetHeight - padding;
+                const maxLeft = window.innerWidth - element.offsetWidth - padding;
                 
-                element.style.top = Math.max(0, Math.min(newTop, maxTop)) + "px";
-                element.style.left = Math.max(0, Math.min(newLeft, maxLeft)) + "px";
+                element.style.top = Math.max(padding, Math.min(newTop, maxTop)) + "px";
+                element.style.left = Math.max(padding, Math.min(newLeft, maxLeft)) + "px";
                 element.style.bottom = 'auto';
                 element.style.right = 'auto';
             }
 
             function closeDragElement() {
+                isDraggingElement = false;
                 document.onmouseup = null;
                 document.onmousemove = null;
                 document.ontouchend = null;
                 document.ontouchmove = null;
                 element.classList.remove('dragging');
+                element.style.cursor = 'move';
             }
         }
 
@@ -844,17 +868,26 @@ INTERFACE = """
             location.reload();
         }
 
-        // Keep connection status updated
-        setInterval(() => {
-            fetch('/ping').then(() => {
-                document.getElementById('connection-status').style.color = '#4eff4e';
-            }).catch(() => {
-                document.getElementById('connection-status').style.color = '#ff4444';
-            });
-        }, 2000);
-        
         // Load button positions on startup
         setTimeout(loadButtonPositions, 500);
+        
+        // Handle fullscreen change events
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+        document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+        
+        function handleFullscreenChange() {
+            const isInFullscreen = !!(document.fullscreenElement || 
+                                     document.webkitFullscreenElement || 
+                                     document.mozFullScreenElement || 
+                                     document.msFullscreenElement);
+            
+            if (!isInFullscreen && isFullscreen) {
+                // User exited fullscreen via ESC or browser controls
+                exitFullscreen();
+            }
+        }
     </script>
 </body>
 </html>
@@ -1035,12 +1068,21 @@ def scroll_up():
 def scroll_down():
     pyautogui.scroll(-3)
 
+def press_enter():
+    pyautogui.press('enter')
+
+def middle_click():
+    pyautogui.middleClick()
+    mark_click()
+
 ACTIONS = {
     "click": lambda: (pyautogui.click(), mark_click()),
+    "middle_click": middle_click,
     "right_click": lambda: (pyautogui.rightClick(), mark_click()),
     "drag_start": lambda: pyautogui.mouseDown(),
     "drag_end": lambda: pyautogui.mouseUp(),
     "type": lambda val: pyautogui.write(val, interval=0.01),
+    "enter": press_enter,
     "move_joy": lambda x, y: pyautogui.moveRel(float(x)*2, float(y)*2, _pause=False),
     "move_abs": lambda x, y: (setattr(__import__('__main__'), 'zoom_center_x', float(x)), 
                                setattr(__import__('__main__'), 'zoom_center_y', float(y)),
@@ -1075,8 +1117,15 @@ if __name__ == '__main__':
     print("🖥️  Enhanced Remote Desktop Server")
     print("=" * 50)
     print(f"🌐 Access at: http://0.0.0.0:5000")
-    print(f"🔒 Default password: 1234")
+    print(f"🔒 Default password: lmaoo")
     print(f"📱 Screen size: {SCREEN_W}x{SCREEN_H}")
     print(f"🔊 Audio control: {'Enabled' if audio_available else 'Disabled (install pycaw)'}")
+    print("=" * 50)
+    print("\n✨ NEW FEATURES:")
+    print("   • Empty text field + Send = Enter key")
+    print("   • Middle click button added")
+    print("   • Dedicated Exit Fullscreen button")
+    print("   • Customizable fullscreen button positions")
+    print("   • Drag toggle in fullscreen mode")
     print("=" * 50)
     app.run(host='0.0.0.0', port=5000, threaded=True, debug=False)
