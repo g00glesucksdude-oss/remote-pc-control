@@ -1474,7 +1474,7 @@ if __name__ == '__main__':
     print("🖥️  Enhanced Remote Desktop Server")
     print("=" * 50)
     print(f"🌐 Access at: http://0.0.0.0:5000")
-    print(f"🔒 Default password: idk")
+    print(f"🔒 Default password: secret")
     print(f"📱 Screen size: {SCREEN_W}x{SCREEN_H}")
     print(f"🔊 Audio control: {'Enabled' if audio_available else 'Disabled (install pycaw)'}")
     print("=" * 50)
