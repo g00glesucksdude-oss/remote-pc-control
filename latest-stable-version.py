@@ -16,13 +16,16 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "night_shift_joystick_secure_v2")
 
 # --- CONFIGURATION ---
-PASSWORD_HASH = generate_password_hash(os.environ.get("REMOTE_PASS", "lol"))
+PASSWORD_HASH = generate_password_hash(os.environ.get("REMOTE_PASS", "idk"))
 SCREEN_W, SCREEN_H = pyautogui.size()
 pyautogui.FAILSAFE = False
 zoom_factor = 1.0
 zoom_center_x = SCREEN_W // 2
 zoom_center_y = SCREEN_H // 2
 last_click_time = 0
+
+# Track held keys
+held_keys = set()
 
 # Initialize audio control
 try:
@@ -283,6 +286,38 @@ INTERFACE = """
             box-shadow: 0 0 25px rgba(74, 158, 255, 0.8);
         }
         
+        .fs-btn.hidden {
+            opacity: 0.3;
+        }
+        
+        .fs-btn.actually-hidden {
+            display: none !important;
+        }
+        
+        /* Hide Confirmation Dialog */
+        #hide-confirm-dialog {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(26, 26, 26, 0.98);
+            padding: 20px;
+            border-radius: 12px;
+            border: 2px solid #4a9eff;
+            display: none;
+            z-index: 300;
+            box-shadow: 0 0 30px rgba(74, 158, 255, 0.5);
+        }
+        
+        #hide-confirm-dialog.show {
+            display: block;
+        }
+        
+        #hide-confirm-dialog button {
+            margin: 0 5px;
+            min-width: 80px;
+        }
+        
         /* Volume Control */
         #volume-control {
             position: fixed;
@@ -366,6 +401,10 @@ INTERFACE = """
         .vk-key.active {
             background: #4a9eff;
         }
+        .vk-key.held {
+            background: #ff4444;
+            box-shadow: 0 0 10px rgba(255, 68, 68, 0.7);
+        }
     </style>
 </head>
 <body>
@@ -391,6 +430,11 @@ INTERFACE = """
         <div class="setting-item">
             <span class="setting-label">Full Keyboard</span>
             <div class="toggle-switch" id="keyboard-toggle" onclick="toggleFullKeyboard()"></div>
+        </div>
+        
+        <div class="setting-item">
+            <span class="setting-label">Hold Key Mode</span>
+            <div class="toggle-switch" id="holdkey-toggle" onclick="toggleHoldKeyMode()"></div>
         </div>
         
         <div class="setting-item">
@@ -428,15 +472,17 @@ INTERFACE = """
             <button onclick="doAction('right_click')">🖱️ RIGHT</button>
             
             <button id="dragBtn" onclick="toggleDrag()">✋ DRAG OFF</button>
+            <button id="rightDragBtn" onclick="toggleRightDrag()">✋ R-DRAG OFF</button>
             <button onclick="doAction('scroll_up')">⬆️ SCROLL</button>
-            <button onclick="doAction('scroll_down')">⬇️ SCROLL</button>
             
+            <button onclick="doAction('scroll_down')">⬇️ SCROLL</button>
             <button onclick="toggleVolume()">🔊 VOLUME</button>
             <button onclick="doAction('zoom_in')">🔍 ZOOM+</button>
-            <button onclick="doAction('zoom_out')">🔍 ZOOM-</button>
             
+            <button onclick="doAction('zoom_out')">🔍 ZOOM-</button>
             <button onclick="doAction('zoom_reset')">↺ RESET</button>
             <button onclick="toggleFullscreen()">⛶ FULL</button>
+            
             <button onclick="toggleSettings()">⚙️ SETTINGS</button>
         </div>
         <div class="controls" style="grid-template-columns: 1fr;">
@@ -451,6 +497,15 @@ INTERFACE = """
         </div>
         <div id="joystick-zone-fs"></div>
         
+        <!-- Hide Confirmation Dialog -->
+        <div id="hide-confirm-dialog">
+            <div style="text-align: center; margin-bottom: 15px; color: #4a9eff;">Hide this button?</div>
+            <div style="display: flex; justify-content: center; gap: 10px;">
+                <button onclick="confirmHide(true)" style="background: #ff4444;">Confirm</button>
+                <button onclick="confirmHide(false)" style="background: #666;">Decline</button>
+            </div>
+        </div>
+        
         <!-- Fullscreen Controls -->
         <div class="fullscreen-controls">
             <button class="fs-btn" id="fs-edit" style="top: 20px; right: 20px;" onclick="toggleEditMode()">🔓 EDIT</button>
@@ -458,6 +513,7 @@ INTERFACE = """
             <button class="fs-btn" id="fs-middle" style="bottom: 330px; left: 110px;" onclick="doAction('middle_click')">MIDDLE</button>
             <button class="fs-btn" id="fs-right" style="bottom: 330px; left: 200px;" onclick="doAction('right_click')">RIGHT</button>
             <button class="fs-btn" id="fs-drag" style="bottom: 260px; left: 20px;" onclick="toggleDrag()">DRAG</button>
+            <button class="fs-btn" id="fs-right-drag" style="bottom: 260px; left: 200px;" onclick="toggleRightDrag()">R-DRAG</button>
             <button class="fs-btn" id="fs-scroll-up" style="bottom: 260px; left: 110px;" onclick="doAction('scroll_up')">↑</button>
             <button class="fs-btn" id="fs-scroll-down" style="bottom: 190px; left: 110px;" onclick="doAction('scroll_down')">↓</button>
             
@@ -468,7 +524,7 @@ INTERFACE = """
     </div>
 
     <!-- -------------------------------------------------
-         Virtual Keyboard (hidden until “Full Keyboard” is enabled)
+         Virtual Keyboard (hidden until "Full Keyboard" is enabled)
          ------------------------------------------------- -->
     <div id="virtual-keyboard">
         <!-- Row 1: Function keys -->
@@ -609,6 +665,7 @@ INTERFACE = """
     <script>
         // ------- Global variables ----------
         let isDragging = false;
+        let isRightDragging = false;
         let isFullscreen = false;
         let gyroEnabled = false;
         let sensitivity = 5;
@@ -616,7 +673,11 @@ INTERFACE = """
         let orientationInitialized = false;
         let currentZoom = 1.0;
         let isEditMode = false;
-        let fullKeyboardEnabled = false;   // NEW
+        let fullKeyboardEnabled = false;
+        let holdKeyMode = false;
+        let heldKeys = new Set();
+        let hiddenButtons = new Set();
+        let pendingHideButton = null;
         
         // Managers for both joysticks
         let normalManager = null;
@@ -750,6 +811,17 @@ INTERFACE = """
             fetch(`/action?type=${isDragging ? 'drag_start' : 'drag_end'}`);
         }
 
+        // ---------- RIGHT CLICK DRAG ----------
+        function toggleRightDrag() {
+            isRightDragging = !isRightDragging;
+            const btns = document.querySelectorAll('#rightDragBtn, #fs-right-drag');
+            btns.forEach(btn => {
+                btn.innerText = isRightDragging ? "✋ R-DRAG ON" : "✋ R-DRAG OFF";
+                btn.classList.toggle('active');
+            });
+            fetch(`/action?type=${isRightDragging ? 'right_drag_start' : 'right_drag_end'}`);
+        }
+
         // ---------- FULLSCREEN ----------
         function toggleFullscreen() {
             isFullscreen = !isFullscreen;
@@ -792,7 +864,8 @@ INTERFACE = """
 
         // ---------- SETTINGS ----------
         function toggleSettings() {
-            document.getElementById('settings-panel').classList.toggle('open');
+            const panel = document.getElementById('settings-panel');
+            panel.classList.toggle('open');
         }
 
         // ---------- FULL KEYBOARD ----------
@@ -804,15 +877,50 @@ INTERFACE = """
             toggle.classList.toggle('active');
         }
 
+        // ---------- HOLD KEY MODE ----------
+        function toggleHoldKeyMode() {
+            holdKeyMode = !holdKeyMode;
+            const toggle = document.getElementById('holdkey-toggle');
+            toggle.classList.toggle('active');
+            // Keys remain held even when toggle is turned off
+        }
+
+        // Update visual display of held keys
+        function updateVirtualKeyboardDisplay() {
+            document.querySelectorAll('.vk-key').forEach(btn => {
+                const key = btn.dataset.key;
+                if (heldKeys.has(key)) {
+                    btn.classList.add('held');
+                } else {
+                    btn.classList.remove('held');
+                }
+            });
+        }
+
         // Click a virtual key
         document.getElementById('virtual-keyboard').addEventListener('click', function(e) {
             if (e.target.classList.contains('vk-key')) {
                 const key = e.target.dataset.key;
                 if (!key) return;
-                // visual feedback
-                e.target.classList.add('active');
-                setTimeout(() => e.target.classList.remove('active'), 150);
-                fetch(`/action?type=key&key=${encodeURIComponent(key)}`);
+                
+                if (holdKeyMode) {
+                    // Hold key mode
+                    if (heldKeys.has(key)) {
+                        // Release this key
+                        heldKeys.delete(key);
+                        fetch(`/action?type=key_up&key=${encodeURIComponent(key)}`);
+                    } else {
+                        // Hold this key
+                        heldKeys.add(key);
+                        fetch(`/action?type=key_down&key=${encodeURIComponent(key)}`);
+                    }
+                    updateVirtualKeyboardDisplay();
+                } else {
+                    // Normal key press (visual feedback)
+                    e.target.classList.add('active');
+                    setTimeout(() => e.target.classList.remove('active'), 150);
+                    fetch(`/action?type=key&key=${encodeURIComponent(key)}`);
+                }
             }
         });
 
@@ -904,6 +1012,11 @@ INTERFACE = """
                 editBtn.classList.add('active');
                 buttons.forEach(btn => {
                     btn.classList.add('draggable');
+                    // Show hidden buttons in edit mode (transparent)
+                    if (hiddenButtons.has(btn.id)) {
+                        btn.classList.remove('actually-hidden');
+                        btn.classList.add('hidden');
+                    }
                     makeDraggable(btn);
                 });
             } else {
@@ -911,38 +1024,76 @@ INTERFACE = """
                 editBtn.classList.remove('active');
                 buttons.forEach(btn => {
                     btn.classList.remove('draggable');
+                    // Actually hide buttons when exiting edit mode
+                    if (hiddenButtons.has(btn.id)) {
+                        btn.classList.add('actually-hidden');
+                        btn.classList.remove('hidden');
+                    }
                     removeDraggable(btn);
                 });
                 saveButtonPositions();
+                saveHiddenButtons();
+                // Close any open hide dialog
+                document.getElementById('hide-confirm-dialog').classList.remove('show');
+                pendingHideButton = null;
             }
+        }
+
+        function confirmHide(confirm) {
+            const dialog = document.getElementById('hide-confirm-dialog');
+            dialog.classList.remove('show');
+            
+            if (confirm && pendingHideButton) {
+                if (hiddenButtons.has(pendingHideButton.id)) {
+                    // Unhide
+                    hiddenButtons.delete(pendingHideButton.id);
+                    pendingHideButton.classList.remove('hidden');
+                } else {
+                    // Hide
+                    hiddenButtons.add(pendingHideButton.id);
+                    pendingHideButton.classList.add('hidden');
+                }
+            }
+            pendingHideButton = null;
         }
 
         function makeDraggable(element) {
             let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
             let isDraggingElement = false;
+            let clickStartTime = 0;
+            
             element.onmousedown = dragMouseDown;
             element.ontouchstart = dragTouchStart;
+            
             function dragMouseDown(e) {
+                clickStartTime = Date.now();
                 e.preventDefault(); e.stopPropagation();
-                isDraggingElement = true;
+                isDraggingElement = false;
                 pos3 = e.clientX; pos4 = e.clientY;
                 document.onmouseup = closeDragElement;
                 document.onmousemove = elementDrag;
-                element.classList.add('dragging');
-                element.style.cursor = 'grabbing';
             }
+            
             function dragTouchStart(e) {
+                clickStartTime = Date.now();
                 e.preventDefault(); e.stopPropagation();
-                isDraggingElement = true;
+                isDraggingElement = false;
                 const touch = e.touches[0];
                 pos3 = touch.clientX; pos4 = touch.clientY;
                 document.ontouchend = closeDragElement;
                 document.ontouchmove = elementDragTouch;
-                element.classList.add('dragging');
             }
+            
             function elementDrag(e) {
-                if (!isDraggingElement) return;
                 e.preventDefault();
+                const moved = Math.abs(pos3 - e.clientX) > 5 || Math.abs(pos4 - e.clientY) > 5;
+                if (moved) {
+                    isDraggingElement = true;
+                    element.classList.add('dragging');
+                    element.style.cursor = 'grabbing';
+                }
+                if (!isDraggingElement) return;
+                
                 pos1 = pos3 - e.clientX;
                 pos2 = pos4 - e.clientY;
                 pos3 = e.clientX; pos4 = e.clientY;
@@ -956,10 +1107,17 @@ INTERFACE = """
                 element.style.bottom = 'auto';
                 element.style.right = 'auto';
             }
+            
             function elementDragTouch(e) {
-                if (!isDraggingElement) return;
                 e.preventDefault();
                 const touch = e.touches[0];
+                const moved = Math.abs(pos3 - touch.clientX) > 5 || Math.abs(pos4 - touch.clientY) > 5;
+                if (moved) {
+                    isDraggingElement = true;
+                    element.classList.add('dragging');
+                }
+                if (!isDraggingElement) return;
+                
                 pos1 = pos3 - touch.clientX;
                 pos2 = pos4 - touch.clientY;
                 pos3 = touch.clientX; pos4 = touch.clientY;
@@ -973,7 +1131,16 @@ INTERFACE = """
                 element.style.bottom = 'auto';
                 element.style.right = 'auto';
             }
+            
             function closeDragElement() {
+                const clickDuration = Date.now() - clickStartTime;
+                // If it was a quick tap without dragging, show hide dialog
+                if (!isDraggingElement && clickDuration < 300) {
+                    pendingHideButton = element;
+                    const dialog = document.getElementById('hide-confirm-dialog');
+                    dialog.classList.add('show');
+                }
+                
                 isDraggingElement = false;
                 document.onmouseup = null; document.onmousemove = null;
                 document.ontouchend = null; document.ontouchmove = null;
@@ -981,6 +1148,7 @@ INTERFACE = """
                 element.style.cursor = 'move';
             }
         }
+        
         function removeDraggable(element) {
             element.onmousedown = null;
             element.ontouchstart = null;
@@ -1013,9 +1181,31 @@ INTERFACE = """
         }
         function resetButtonPositions() {
             localStorage.removeItem('buttonPositions');
+            localStorage.removeItem('hiddenButtons');
             location.reload();
         }
-        setTimeout(loadButtonPositions, 500);
+        
+        function saveHiddenButtons() {
+            localStorage.setItem('hiddenButtons', JSON.stringify([...hiddenButtons]));
+        }
+        
+        function loadHiddenButtons() {
+            const saved = localStorage.getItem('hiddenButtons');
+            if (saved) {
+                hiddenButtons = new Set(JSON.parse(saved));
+                hiddenButtons.forEach(id => {
+                    const btn = document.getElementById(id);
+                    if (btn) {
+                        btn.classList.add('actually-hidden');
+                    }
+                });
+            }
+        }
+        
+        setTimeout(() => {
+            loadButtonPositions();
+            loadHiddenButtons();
+        }, 500);
     </script>
 </body>
 </html>
@@ -1214,6 +1404,24 @@ def press_key(key):
     if key:
         pyautogui.press(key)
 
+def key_down(key):
+    global held_keys
+    if key:
+        held_keys.add(key)
+        pyautogui.keyDown(key)
+
+def key_up(key):
+    global held_keys
+    if key:
+        held_keys.discard(key)
+        pyautogui.keyUp(key)
+
+def right_drag_start():
+    pyautogui.mouseDown(button='right')
+
+def right_drag_end():
+    pyautogui.mouseUp(button='right')
+
 # Mapping from action name → callable
 ACTIONS = {
     "click": lambda: (pyautogui.click(), mark_click()),
@@ -1221,6 +1429,8 @@ ACTIONS = {
     "right_click": lambda: (pyautogui.rightClick(), mark_click()),
     "drag_start": lambda: pyautogui.mouseDown(),
     "drag_end": lambda: pyautogui.mouseUp(),
+    "right_drag_start": right_drag_start,
+    "right_drag_end": right_drag_end,
     "type": lambda val: pyautogui.write(val, interval=0.01),
     "enter": press_enter,
     "move_joy": lambda x, y: pyautogui.moveRel(float(x)*2, float(y)*2, _pause=False),
@@ -1235,7 +1445,9 @@ ACTIONS = {
     "volume": set_volume,
     "scroll_up": scroll_up,
     "scroll_down": scroll_down,
-    "key": press_key,                 # NEW – generic key press
+    "key": press_key,
+    "key_down": key_down,
+    "key_up": key_up,
 }
 
 @app.route('/action')
@@ -1250,7 +1462,7 @@ def action():
             ACTIONS[t](request.args.get('x', 0), request.args.get('y', 0))
         elif t == "volume":
             ACTIONS[t](request.args.get('val', 50))
-        elif t == "key":                         # NEW – send key name
+        elif t in ["key", "key_down", "key_up"]:
             ACTIONS[t](request.args.get('key', ''))
         else:
             ACTIONS[t]()
@@ -1262,13 +1474,14 @@ if __name__ == '__main__':
     print("🖥️  Enhanced Remote Desktop Server")
     print("=" * 50)
     print(f"🌐 Access at: http://0.0.0.0:5000")
-    print(f"🔒 Default password: lmaoo")
+    print(f"🔒 Default password: idk")
     print(f"📱 Screen size: {SCREEN_W}x{SCREEN_H}")
     print(f"🔊 Audio control: {'Enabled' if audio_available else 'Disabled (install pycaw)'}")
     print("=" * 50)
     print("\n✨ NEW FEATURES:")
-    print("   • Fixed cursor offset when zoomed")
-    print("   • Full‑keyboard overlay (all keys + numpad) via Settings → Full Keyboard")
-    print("   • Virtual‑key press goes through `/action?type=key`")
+    print("   • Settings panel auto-closes keyboard")
+    print("   • Hold Key Mode for keyboard combinations (Shift+Ctrl+X, F5+R, etc.)")
+    print("   • Right-click drag feature")
+    print("   • Visual feedback for held keys (red highlight)")
     print("=" * 50)
     app.run(host='0.0.0.0', port=5000, threaded=True, debug=False)
